@@ -53,7 +53,7 @@ export default function ProductosPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const load = async (q: string, p: number) => {
     setLoading(true);

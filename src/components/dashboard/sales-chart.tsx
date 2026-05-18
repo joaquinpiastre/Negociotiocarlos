@@ -37,13 +37,13 @@ export function SalesChart({ data }: { data: ChartPoint[] }) {
           tick={{ fontSize: 11, fill: "#a1a1aa" }}
           axisLine={false}
           tickLine={false}
-          tickFormatter={(v: number) =>
+          tickFormatter={(v) =>
             v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`
           }
           width={46}
         />
         <Tooltip
-          formatter={(value: number) => [formatARS(value), "Ventas"]}
+          formatter={(value) => [formatARS(value as number), "Ventas"]}
           labelStyle={{ fontWeight: 600, color: "#18181b" }}
           contentStyle={{
             fontSize: 13,

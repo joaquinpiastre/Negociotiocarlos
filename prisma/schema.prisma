@@ -1,0 +1,210 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  CAJERO
+  REPOSITOR
+}
+
+enum MovementType {
+  ENTRADA
+  SALIDA
+  AJUSTE
+  PERDIDA
+  DEVOLUCION
+  VENCIMIENTO
+}
+
+enum PaymentMethod {
+  EFECTIVO
+  TRANSFERENCIA
+  MERCADO_PAGO
+  TARJETA
+}
+
+enum UnitType {
+  UNIDAD
+  KG
+  LITRO
+  PACK
+  CAJA
+}
+
+model User {
+  id           String          @id @default(cuid())
+  name         String
+  email        String          @unique
+  password     String
+  role         UserRole        @default(CAJERO)
+  active       Boolean         @default(true)
+  lastAccessAt DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  stockMoves   StockMovement[]
+  sales        Sale[]
+  purchases    Purchase[]
+  accounts     Account[]
+  sessions     Session[]
+}
+
+model Category {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[]
+}
+
+model Supplier {
+  id          String      @id @default(cuid())
+  name        String
+  phone       String?
+  email       String?
+  address     String?
+  cuit        String?
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  products    Product[]
+  purchaseOps Purchase[]
+}
+
+model Product {
+  id              String          @id @default(cuid())
+  barcode         String?         @unique
+  name            String
+  description     String?
+  brand           String?
+  costPrice       Decimal         @db.Decimal(10, 2)
+  salePrice       Decimal         @db.Decimal(10, 2)
+  stock           Decimal         @default(0) @db.Decimal(10, 3)
+  minStock        Decimal         @default(0) @db.Decimal(10, 3)
+  unitType        UnitType        @default(UNIDAD)
+  expiresAt       DateTime?
+  imageUrl        String?
+  active          Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  categoryId      String
+  supplierId      String?
+  category        Category        @relation(fields: [categoryId], references: [id])
+  supplier        Supplier?       @relation(fields: [supplierId], references: [id])
+  stockMovements  StockMovement[]
+  saleItems       SaleItem[]
+  purchaseItems   PurchaseItem[]
+}
+
+model StockMovement {
+  id          String       @id @default(cuid())
+  quantity    Decimal      @db.Decimal(10, 3)
+  type        MovementType
+  reason      String?
+  stockBefore Decimal      @db.Decimal(10, 3)
+  stockAfter  Decimal      @db.Decimal(10, 3)
+  createdAt   DateTime     @default(now())
+  productId   String
+  userId      String
+  product     Product      @relation(fields: [productId], references: [id])
+  user        User         @relation(fields: [userId], references: [id])
+}
+
+model Sale {
+  id            String      @id @default(cuid())
+  subtotal      Decimal     @db.Decimal(10, 2)
+  discount      Decimal     @default(0) @db.Decimal(10, 2)
+  total         Decimal     @db.Decimal(10, 2)
+  paymentMethod PaymentMethod
+  createdAt     DateTime    @default(now())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id])
+  items         SaleItem[]
+}
+
+model SaleItem {
+  id          String   @id @default(cuid())
+  quantity    Decimal  @db.Decimal(10, 3)
+  unitPrice   Decimal  @db.Decimal(10, 2)
+  total       Decimal  @db.Decimal(10, 2)
+  saleId      String
+  productId   String
+  sale        Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product     Product  @relation(fields: [productId], references: [id])
+}
+
+model Purchase {
+  id          String         @id @default(cuid())
+  notes       String?
+  purchasedAt DateTime       @default(now())
+  createdAt   DateTime       @default(now())
+  supplierId  String
+  userId      String
+  supplier    Supplier       @relation(fields: [supplierId], references: [id])
+  user        User           @relation(fields: [userId], references: [id])
+  items       PurchaseItem[]
+}
+
+model PurchaseItem {
+  id         String   @id @default(cuid())
+  quantity   Decimal  @db.Decimal(10, 3)
+  costPrice  Decimal  @db.Decimal(10, 2)
+  total      Decimal  @db.Decimal(10, 2)
+  purchaseId String
+  productId  String
+  purchase   Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id])
+}
+
+model BusinessSettings {
+  id                      String   @id @default(cuid())
+  businessName            String   @default("Tio Carlos")
+  location                String   @default("Chos Malal")
+  phone                   String?
+  logoUrl                 String?
+  currency                String   @default("ARS")
+  suggestedProfitPercent  Decimal  @default(30) @db.Decimal(5, 2)
+  globalMinStock          Decimal  @default(3) @db.Decimal(10, 3)
+  receiptHeader           String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}

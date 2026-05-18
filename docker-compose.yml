@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: stock-tio-carlos-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: stock_tio_carlos
+    ports:
+      - "5432:5432"
+    volumes:
+      - stock_tio_carlos_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d stock_tio_carlos"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  stock_tio_carlos_pgdata:

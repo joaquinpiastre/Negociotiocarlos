@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import {
   Search, Plus, Minus, Trash2, ShoppingCart, CheckCircle,
   Loader2, Camera, X,
@@ -53,6 +53,8 @@ export default function VentasPage() {
   const [error, setError] = useState("");
   const [scanActive, setScanActive] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scanBuffer = useRef("");
+  const scanLastKey = useRef(0);
 
   const searchProducts = useCallback(async (q: string) => {
     if (!q.trim()) {
@@ -119,6 +121,39 @@ export default function VentasPage() {
     },
     [addToCart],
   );
+
+  // Escucha la pistola de códigos de barra (HID/teclado): caracteres llegan < 50ms entre sí
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const now = Date.now();
+
+      if (e.key === "Enter") {
+        const code = scanBuffer.current;
+        scanBuffer.current = "";
+        scanLastKey.current = 0;
+        if (code.length >= 4) {
+          e.preventDefault();
+          setQuery("");
+          setResults([]);
+          handleScan(code);
+        }
+        return;
+      }
+
+      if (e.key.length !== 1) return;
+
+      // Si pasó más de 50ms desde la última tecla, el buffer anterior era escritura humana → reiniciar
+      if (now - scanLastKey.current > 50) {
+        scanBuffer.current = "";
+      }
+
+      scanBuffer.current += e.key;
+      scanLastKey.current = now;
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [handleScan]);
 
   const updateQty = (productId: string, delta: number) => {
     setCart((prev) =>

@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import {
   Search, Plus, Minus, Trash2, ShoppingCart, CheckCircle,
-  Loader2, Camera, X,
+  Loader2, Camera, X, ScanLine,
 } from "lucide-react";
 import { BarcodeScanner } from "@/components/scanner/barcode-scanner";
 
@@ -43,24 +43,37 @@ const ars = (v: number) =>
 
 export default function VentasPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
+
+  // búsqueda por nombre
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Product[]>([]);
   const [searching, setSearching] = useState(false);
+
+  // input dedicado a la pistola / código
+  const [scanCode, setScanCode] = useState("");
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanError, setScanError] = useState("");
+  const scanInputRef = useRef<HTMLInputElement>(null);
+
   const [discount, setDiscount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("EFECTIVO");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
-  const [scanActive, setScanActive] = useState(false);
+  const [cameraActive, setCameraActive] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const scanBuffer = useRef("");
-  const scanLastKey = useRef(0);
+
+  // Auto-enfocar el input del scanner al cargar la página
+  useEffect(() => {
+    scanInputRef.current?.focus();
+  }, []);
+
+  const refocusScanner = () => {
+    setTimeout(() => scanInputRef.current?.focus(), 80);
+  };
 
   const searchProducts = useCallback(async (q: string) => {
-    if (!q.trim()) {
-      setResults([]);
-      return;
-    }
+    if (!q.trim()) { setResults([]); return; }
     setSearching(true);
     try {
       const res = await fetch(`/api/productos?search=${encodeURIComponent(q)}`);
@@ -102,58 +115,39 @@ export default function VentasPage() {
     setResults([]);
   }, []);
 
-  const handleScan = useCallback(
-    async (barcode: string) => {
-      try {
-        const res = await fetch(`/api/products/barcode/${encodeURIComponent(barcode)}`);
-        if (res.ok) {
-          const product: Product = await res.json();
-          addToCart(product);
-          setScanActive(false);
-        } else {
-          setError(`Código "${barcode}" no registrado.`);
-          setTimeout(() => setError(""), 3000);
-        }
-      } catch {
-        setError("Error de conexión.");
-        setTimeout(() => setError(""), 3000);
+  // Buscar por código de barras y agregar al carrito
+  const scanBarcode = useCallback(async (code: string) => {
+    const trimmed = code.trim();
+    if (!trimmed) return;
+    setScanLoading(true);
+    setScanError("");
+    try {
+      const res = await fetch(`/api/products/barcode/${encodeURIComponent(trimmed)}`);
+      if (res.ok) {
+        const product: Product = await res.json();
+        addToCart(product);
+        setCameraActive(false);
+      } else {
+        setScanError(`"${trimmed}" no registrado`);
+        setTimeout(() => setScanError(""), 3000);
       }
-    },
-    [addToCart],
-  );
+    } catch {
+      setScanError("Error de conexión");
+      setTimeout(() => setScanError(""), 3000);
+    } finally {
+      setScanLoading(false);
+      setScanCode("");
+      refocusScanner();
+    }
+  }, [addToCart]);
 
-  // Escucha la pistola de códigos de barra (HID/teclado): caracteres llegan < 50ms entre sí
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      const now = Date.now();
-
-      if (e.key === "Enter") {
-        const code = scanBuffer.current;
-        scanBuffer.current = "";
-        scanLastKey.current = 0;
-        if (code.length >= 4) {
-          e.preventDefault();
-          setQuery("");
-          setResults([]);
-          handleScan(code);
-        }
-        return;
-      }
-
-      if (e.key.length !== 1) return;
-
-      // Si pasó más de 50ms desde la última tecla, el buffer anterior era escritura humana → reiniciar
-      if (now - scanLastKey.current > 50) {
-        scanBuffer.current = "";
-      }
-
-      scanBuffer.current += e.key;
-      scanLastKey.current = now;
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleScan]);
+  // Enter en el input del scanner → disparar búsqueda
+  const handleScanKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      scanBarcode(scanCode);
+    }
+  };
 
   const updateQty = (productId: string, delta: number) => {
     setCart((prev) =>
@@ -196,6 +190,7 @@ export default function VentasPage() {
         setCart([]);
         setDiscount(0);
         setTimeout(() => setSuccess(false), 4000);
+        refocusScanner();
       } else {
         const data = await res.json();
         setError(data.error ?? "Error al registrar la venta");
@@ -217,40 +212,76 @@ export default function VentasPage() {
         </div>
       </div>
 
-      {/* Busqueda */}
+      {/* Input principal: pistola / código de barras */}
+      <div className="rounded-xl border-2 border-teal-600 bg-white p-4 shadow-sm">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-teal-700">
+          Lector de código de barras
+        </p>
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <ScanLine size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-teal-500" />
+            <input
+              ref={scanInputRef}
+              value={scanCode}
+              onChange={(e) => setScanCode(e.target.value)}
+              onKeyDown={handleScanKeyDown}
+              placeholder="Apuntá la pistola acá y escaneá..."
+              autoComplete="off"
+              className="w-full rounded-lg border border-teal-300 bg-teal-50 py-3 pl-9 pr-3 text-sm font-mono outline-none ring-teal-500 focus:ring-2 focus:bg-white"
+            />
+            {scanLoading && (
+              <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-teal-600" />
+            )}
+          </div>
+          <button
+            onClick={() => scanBarcode(scanCode)}
+            disabled={!scanCode.trim() || scanLoading}
+            className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-40"
+          >
+            Buscar
+          </button>
+        </div>
+        {scanError && (
+          <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{scanError}</p>
+        )}
+        <p className="mt-1.5 text-xs text-zinc-400">
+          Con la pistola conectada, este campo se llena solo. Presioná Enter o el botón para agregar.
+        </p>
+      </div>
+
+      {/* Búsqueda por nombre */}
       <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-zinc-400">
+          Buscar por nombre
+        </p>
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
             <input
               value={query}
               onChange={(e) => handleQueryChange(e.target.value)}
-              placeholder="Buscar producto por nombre o código..."
+              onBlur={() => setTimeout(() => setResults([]), 150)}
+              placeholder="Nombre del producto..."
               className="w-full rounded-lg border border-zinc-300 py-2.5 pl-9 pr-3 text-sm outline-none ring-teal-500 focus:ring"
             />
             {searching && (
-              <Loader2
-                size={14}
-                className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-zinc-400"
-              />
+              <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-zinc-400" />
             )}
           </div>
           <button
-            onClick={() => setScanActive(!scanActive)}
+            onClick={() => { setCameraActive(!cameraActive); refocusScanner(); }}
             className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-              scanActive
-                ? "bg-red-50 text-red-700"
-                : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+              cameraActive ? "bg-red-50 text-red-700" : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
             }`}
           >
             <Camera size={16} />
-            <span className="hidden sm:inline">{scanActive ? "Cerrar" : "Escanear"}</span>
+            <span className="hidden sm:inline">{cameraActive ? "Cerrar" : "Cámara"}</span>
           </button>
         </div>
 
-        {scanActive && (
+        {cameraActive && (
           <div className="mt-3">
-            <BarcodeScanner onScan={handleScan} active={scanActive} />
+            <BarcodeScanner onScan={(code) => { scanBarcode(code); setCameraActive(false); }} active={cameraActive} />
           </div>
         )}
 
@@ -259,7 +290,7 @@ export default function VentasPage() {
             {results.map((p) => (
               <button
                 key={p.id}
-                onClick={() => addToCart(p)}
+                onMouseDown={() => { addToCart(p); refocusScanner(); }}
                 className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm hover:bg-teal-50"
               >
                 <div>
@@ -304,10 +335,7 @@ export default function VentasPage() {
                 <span className="w-20 shrink-0 text-right text-sm font-bold text-zinc-900">
                   {ars(item.salePrice * item.quantity)}
                 </span>
-                <button
-                  onClick={() => removeItem(item.productId)}
-                  className="shrink-0 text-zinc-300 hover:text-red-500"
-                >
+                <button onClick={() => removeItem(item.productId)} className="shrink-0 text-zinc-300 hover:text-red-500">
                   <Trash2 size={15} />
                 </button>
               </div>
@@ -318,7 +346,7 @@ export default function VentasPage() {
 
       {cart.length === 0 && !success && (
         <div className="rounded-xl border border-dashed border-zinc-300 bg-white py-10 text-center text-sm text-zinc-400">
-          El carrito está vacío. Buscá o escaneá un producto.
+          El carrito está vacío. Escaneá o buscá un producto.
         </div>
       )}
 
@@ -357,9 +385,7 @@ export default function VentasPage() {
             </div>
 
             <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                Medio de pago
-              </p>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Medio de pago</p>
               <div className="grid grid-cols-2 gap-2">
                 {(Object.keys(paymentLabels) as PaymentMethod[]).map((pm) => (
                   <button
@@ -390,9 +416,7 @@ export default function VentasPage() {
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-teal-800 py-3 font-bold text-white hover:bg-teal-900 disabled:opacity-60"
             >
               {loading ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" /> Procesando...
-                </>
+                <><Loader2 size={16} className="animate-spin" /> Procesando...</>
               ) : (
                 <>Confirmar venta · {ars(total)}</>
               )}

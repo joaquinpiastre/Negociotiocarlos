@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { ShoppingBag, Plus, Trash2, Loader2, CheckCircle, X, Search } from "lucide-react";
+import { ShoppingBag, Plus, Trash2, Loader2, CheckCircle, X, Search, ScanLine } from "lucide-react";
 
 type Supplier = { id: string; name: string };
 type Product = { id: string; name: string; costPrice: string; stock: string; category: { name: string } };
@@ -35,6 +35,11 @@ export default function ComprasPage() {
   const [searching, setSearching] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [scanCode, setScanCode] = useState("");
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanError, setScanError] = useState("");
+  const scanInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     fetch("/api/proveedores").then((r) => r.json()).then(setSuppliers);
     loadHistory();
@@ -67,6 +72,30 @@ export default function ComprasPage() {
     setProductQuery(value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => searchProducts(value), 300);
+  };
+
+  const scanBarcode = async (code: string) => {
+    const trimmed = code.trim();
+    if (!trimmed) return;
+    setScanLoading(true);
+    setScanError("");
+    try {
+      const res = await fetch(`/api/products/barcode/${encodeURIComponent(trimmed)}`);
+      if (res.ok) {
+        const product: Product = await res.json();
+        addItem(product);
+      } else {
+        setScanError(`"${trimmed}" no registrado`);
+        setTimeout(() => setScanError(""), 3000);
+      }
+    } catch {
+      setScanError("Error de conexión");
+      setTimeout(() => setScanError(""), 3000);
+    } finally {
+      setScanLoading(false);
+      setScanCode("");
+      setTimeout(() => scanInputRef.current?.focus(), 80);
+    }
   };
 
   const addItem = (product: Product) => {
@@ -165,13 +194,41 @@ export default function ComprasPage() {
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-zinc-700">Agregar producto</label>
+          <label className="mb-1 block text-sm font-medium text-zinc-700">Lector de código de barras</label>
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <ScanLine size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-teal-500" />
+              <input
+                ref={scanInputRef}
+                value={scanCode}
+                onChange={(e) => setScanCode(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); scanBarcode(scanCode); } }}
+                placeholder="Apuntá la pistola acá y escaneá..."
+                autoComplete="off"
+                className="w-full rounded-lg border border-teal-300 bg-teal-50 py-2 pl-9 pr-3 text-sm font-mono outline-none ring-teal-500 focus:ring-2 focus:bg-white"
+              />
+              {scanLoading && <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-teal-600" />}
+            </div>
+            <button
+              onClick={() => scanBarcode(scanCode)}
+              disabled={!scanCode.trim() || scanLoading}
+              className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-40"
+            >
+              Buscar
+            </button>
+          </div>
+          {scanError && <p className="mt-1 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{scanError}</p>}
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-zinc-700">Buscar por nombre</label>
           <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
             <input
               value={productQuery}
               onChange={(e) => handleProductSearch(e.target.value)}
-              placeholder="Buscar producto..."
+              onBlur={() => setTimeout(() => setProductResults([]), 150)}
+              placeholder="Buscar producto por nombre..."
               className="w-full rounded-lg border border-zinc-300 py-2 pl-9 pr-3 text-sm outline-none ring-teal-500 focus:ring"
             />
             {searching && <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-zinc-400" />}
@@ -181,7 +238,7 @@ export default function ComprasPage() {
               {productResults.map((p) => (
                 <button
                   key={p.id}
-                  onClick={() => addItem(p)}
+                  onMouseDown={() => addItem(p)}
                   className="flex w-full items-center justify-between px-4 py-2 text-left text-sm hover:bg-teal-50"
                 >
                   <span className="font-medium text-zinc-900">{p.name}</span>

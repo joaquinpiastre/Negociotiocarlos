@@ -250,58 +250,47 @@ export default function ComprasPage() {
         </div>
 
         {items.length > 0 && (
-          <div className="overflow-x-auto rounded-lg border border-zinc-200">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="border-b border-zinc-200 bg-zinc-50 text-xs text-zinc-500">
-                  <th className="px-3 py-2 text-left">Producto</th>
-                  <th className="px-3 py-2 text-right">Cantidad</th>
-                  <th className="px-3 py-2 text-right">Costo unit.</th>
-                  <th className="px-3 py-2 text-right">Subtotal</th>
-                  <th className="px-3 py-2"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item) => (
-                  <tr key={item.productId} className="border-b border-zinc-100">
-                    <td className="px-3 py-2 font-medium text-zinc-900">{item.name}</td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="number"
-                        min={1}
-                        value={item.quantity}
-                        onChange={(e) => updateItem(item.productId, "quantity", Number(e.target.value))}
-                        className="w-16 rounded border border-zinc-300 px-2 py-1 text-right text-sm"
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="number"
-                        min={0}
-                        value={item.costPrice}
-                        onChange={(e) => updateItem(item.productId, "costPrice", Number(e.target.value))}
-                        className="w-24 rounded border border-zinc-300 px-2 py-1 text-right text-sm"
-                      />
-                    </td>
-                    <td className="px-3 py-2 text-right font-semibold">
-                      {ars(item.quantity * item.costPrice)}
-                    </td>
-                    <td className="px-3 py-2">
-                      <button onClick={() => removeItem(item.productId)} className="text-zinc-300 hover:text-red-500">
-                        <Trash2 size={14} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td colSpan={3} className="px-3 py-2 text-right text-sm font-bold text-zinc-900">Total</td>
-                  <td className="px-3 py-2 text-right font-bold text-teal-800">{ars(totalCompra)}</td>
-                  <td></td>
-                </tr>
-              </tfoot>
-            </table>
+          <div className="space-y-2">
+            {items.map((item) => (
+              <div key={item.productId} className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
+                <p className="flex-1 min-w-0 truncate text-sm font-semibold text-zinc-900">{item.name}</p>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  <label className="text-xs text-zinc-400">Cant.</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={item.quantity}
+                    onChange={(e) => updateItem(item.productId, "quantity", Number(e.target.value))}
+                    className="w-14 rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-center text-sm font-semibold outline-none ring-teal-500 focus:ring"
+                  />
+                </div>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  <label className="text-xs text-zinc-400">$</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={item.costPrice}
+                    onChange={(e) => updateItem(item.productId, "costPrice", Number(e.target.value))}
+                    className="w-24 rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-right text-sm font-semibold outline-none ring-teal-500 focus:ring"
+                  />
+                </div>
+
+                <p className="w-20 shrink-0 text-right text-sm font-bold text-teal-700">
+                  {ars(item.quantity * item.costPrice)}
+                </p>
+
+                <button onClick={() => removeItem(item.productId)} className="shrink-0 text-zinc-300 hover:text-red-500">
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            ))}
+            <div className="flex justify-end px-1 pt-1">
+              <p className="text-sm font-bold text-zinc-900">
+                Total: <span className="text-teal-800">{ars(totalCompra)}</span>
+              </p>
+            </div>
           </div>
         )}
 

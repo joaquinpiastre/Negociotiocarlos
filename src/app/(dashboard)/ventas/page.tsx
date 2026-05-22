@@ -3,9 +3,8 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import {
   Search, Plus, Minus, Trash2, ShoppingCart, CheckCircle,
-  Loader2, Camera, X, ScanLine,
+  Loader2, X, ScanLine,
 } from "lucide-react";
-import { BarcodeScanner } from "@/components/scanner/barcode-scanner";
 
 type CartItem = {
   productId: string;
@@ -60,7 +59,6 @@ export default function VentasPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
-  const [cameraActive, setCameraActive] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Auto-enfocar el input del scanner al cargar la página
@@ -126,7 +124,6 @@ export default function VentasPage() {
       if (res.ok) {
         const product: Product = await res.json();
         addToCart(product);
-        setCameraActive(false);
       } else {
         setScanError(`"${trimmed}" no registrado`);
         setTimeout(() => setScanError(""), 3000);
@@ -268,22 +265,7 @@ export default function VentasPage() {
               <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-zinc-400" />
             )}
           </div>
-          <button
-            onClick={() => { setCameraActive(!cameraActive); refocusScanner(); }}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-              cameraActive ? "bg-red-50 text-red-700" : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
-            }`}
-          >
-            <Camera size={16} />
-            <span className="hidden sm:inline">{cameraActive ? "Cerrar" : "Cámara"}</span>
-          </button>
-        </div>
-
-        {cameraActive && (
-          <div className="mt-3">
-            <BarcodeScanner onScan={(code) => { scanBarcode(code); setCameraActive(false); }} active={cameraActive} />
           </div>
-        )}
 
         {results.length > 0 && (
           <div className="mt-2 max-h-52 overflow-y-auto rounded-lg border border-zinc-200 shadow-md">

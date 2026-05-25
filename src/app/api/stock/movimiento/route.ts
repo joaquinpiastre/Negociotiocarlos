@@ -21,7 +21,8 @@ export async function POST(request: Request) {
     return Response.json({ error: "Datos incompletos o invalidos" }, { status: 400 });
   }
 
-  if (!["ENTRADA", "SALIDA"].includes(type)) {
+  const VALID_TYPES = ["ENTRADA", "SALIDA", "PERDIDA", "VENCIMIENTO", "AJUSTE"];
+  if (!VALID_TYPES.includes(type)) {
     return Response.json({ error: "Tipo de movimiento invalido" }, { status: 400 });
   }
 
@@ -33,14 +34,16 @@ export async function POST(request: Request) {
   const stockBefore = Number(product.stock);
   const qty = Number(quantity);
 
-  if (type === "SALIDA" && stockBefore < qty) {
+  const isDecrease = ["SALIDA", "PERDIDA", "VENCIMIENTO", "AJUSTE"].includes(type);
+
+  if (isDecrease && stockBefore < qty) {
     return Response.json(
       { error: `Stock insuficiente. Disponible: ${stockBefore}` },
       { status: 400 },
     );
   }
 
-  const stockAfter = type === "ENTRADA" ? stockBefore + qty : stockBefore - qty;
+  const stockAfter = isDecrease ? stockBefore - qty : stockBefore + qty;
 
   const [movement] = await prisma.$transaction([
     prisma.stockMovement.create({

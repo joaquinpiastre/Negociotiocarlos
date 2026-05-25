@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Package, Plus, Pencil, Trash2, Loader2, X, Check, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { Package, Plus, Pencil, Trash2, Loader2, X, Check, ChevronLeft, ChevronRight, Search, Info } from "lucide-react";
 
 type Category = { id: string; name: string };
 type Supplier = { id: string; name: string };
@@ -12,6 +13,8 @@ type Product = {
   barcode: string | null;
   brand: string | null;
   costPrice: string;
+  ivaRate: string;
+  internalTaxPercent: string;
   salePrice: string;
   stock: string;
   minStock: string;
@@ -24,7 +27,10 @@ const emptyForm = {
   name: "",
   barcode: "",
   brand: "",
-  costPrice: "",
+  baseCostPrice: "",
+  ivaRate: "0",
+  internalTaxPercent: "0",
+  profitPercent: "",
   salePrice: "",
   stock: "",
   minStock: "1",
@@ -36,7 +42,17 @@ const emptyForm = {
 const ars = (v: number) =>
   new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(v);
 
+function computeCostPrice(base: string, iva: string, internalTax: string): number {
+  const b = Number(base) || 0;
+  const ivaFactor = 1 + (Number(iva) || 0) / 100;
+  const taxFactor = 1 + (Number(internalTax) || 0) / 100;
+  return b * ivaFactor * taxFactor;
+}
+
 export default function ProductosPage() {
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === "ADMIN";
+
   const [products, setProducts] = useState<Product[]>([]);
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(1);
@@ -54,6 +70,11 @@ export default function ProductosPage() {
   const [error, setError] = useState("");
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const totalCostPrice = computeCostPrice(form.baseCostPrice, form.ivaRate, form.internalTaxPercent);
+  const recommendedSalePrice = form.profitPercent
+    ? totalCostPrice * (1 + Number(form.profitPercent) / 100)
+    : null;
 
   const load = async (q: string, p: number) => {
     setLoading(true);
@@ -98,11 +119,20 @@ export default function ProductosPage() {
   };
 
   const openEdit = (p: Product) => {
+    const ivaRate = Number(p.ivaRate) || 0;
+    const internalTaxPercent = Number(p.internalTaxPercent) || 0;
+    const costPrice = Number(p.costPrice) || 0;
+    const divisor = (1 + ivaRate / 100) * (1 + internalTaxPercent / 100);
+    const baseCostPrice = divisor > 0 ? costPrice / divisor : costPrice;
+
     setForm({
       name: p.name,
       barcode: p.barcode ?? "",
       brand: p.brand ?? "",
-      costPrice: String(p.costPrice),
+      baseCostPrice: baseCostPrice > 0 ? String(Math.round(baseCostPrice * 100) / 100) : "",
+      ivaRate: String(ivaRate),
+      internalTaxPercent: String(internalTaxPercent),
+      profitPercent: "",
       salePrice: String(p.salePrice),
       stock: String(p.stock),
       minStock: String(p.minStock),
@@ -118,7 +148,7 @@ export default function ProductosPage() {
   const save = async () => {
     if (!form.name.trim()) { setError("El nombre es requerido"); return; }
     if (!form.categoryId) { setError("Seleccioná una categoría"); return; }
-    if (!form.costPrice || !form.salePrice) { setError("Precio de costo y venta son requeridos"); return; }
+    if (!form.baseCostPrice || !form.salePrice) { setError("Precio de costo y venta son requeridos"); return; }
     setSaving(true);
     setError("");
     try {
@@ -131,7 +161,9 @@ export default function ProductosPage() {
           name: form.name.trim(),
           barcode: form.barcode.trim() || null,
           brand: form.brand.trim() || null,
-          costPrice: Number(form.costPrice),
+          costPrice: totalCostPrice,
+          ivaRate: Number(form.ivaRate),
+          internalTaxPercent: Number(form.internalTaxPercent),
           salePrice: Number(form.salePrice),
           stock: Number(form.stock || 0),
           minStock: Number(form.minStock || 1),
@@ -172,17 +204,19 @@ export default function ProductosPage() {
             <p className="text-sm text-zinc-500">{total} productos activos</p>
           </div>
         </div>
-        <button
-          onClick={openNew}
-          className="flex items-center gap-2 rounded-lg bg-teal-800 px-4 py-2 text-sm font-medium text-white hover:bg-teal-900"
-        >
-          <Plus size={16} /> Nuevo
-        </button>
+        {isAdmin && (
+          <button
+            onClick={openNew}
+            className="flex items-center gap-2 rounded-lg bg-teal-800 px-4 py-2 text-sm font-medium text-white hover:bg-teal-900"
+          >
+            <Plus size={16} /> Nuevo
+          </button>
+        )}
       </div>
 
-      {/* Formulario */}
-      {showForm && (
-        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm space-y-3">
+      {/* Formulario (solo admin) */}
+      {showForm && isAdmin && (
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-zinc-900">{editId ? "Editar producto" : "Nuevo producto"}</h2>
             <button onClick={() => setShowForm(false)} className="text-zinc-400 hover:text-zinc-600">
@@ -191,6 +225,7 @@ export default function ProductosPage() {
           </div>
           {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
+          {/* Datos generales */}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div className="sm:col-span-2 lg:col-span-2">
               <label className="mb-1 block text-xs font-medium text-zinc-600">Nombre *</label>
@@ -245,20 +280,98 @@ export default function ProductosPage() {
                 ))}
               </select>
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Precio costo *</label>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                value={form.costPrice}
-                onChange={(e) => set("costPrice", e.target.value)}
-                placeholder="0.00"
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none ring-teal-500 focus:ring"
-              />
+          </div>
+
+          {/* Sección de precios */}
+          <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-4 space-y-4">
+            <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400">Estructura de precios</p>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              {/* Precio de costo sin IVA */}
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-600">Precio de costo sin IVA *</label>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={form.baseCostPrice}
+                  onChange={(e) => set("baseCostPrice", e.target.value)}
+                  placeholder="0.00"
+                  className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none ring-teal-500 focus:ring"
+                />
+              </div>
+
+              {/* IVA */}
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-600">IVA</label>
+                <select
+                  value={form.ivaRate}
+                  onChange={(e) => set("ivaRate", e.target.value)}
+                  className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none ring-teal-500 focus:ring"
+                >
+                  <option value="0">Sin IVA (0%)</option>
+                  <option value="10.5">10,5%</option>
+                  <option value="21">21%</option>
+                </select>
+              </div>
+
+              {/* Impuestos internos */}
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-600">Impuestos internos (%)</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={999}
+                  step="0.01"
+                  value={form.internalTaxPercent}
+                  onChange={(e) => set("internalTaxPercent", e.target.value)}
+                  placeholder="0"
+                  className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none ring-teal-500 focus:ring"
+                />
+              </div>
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Precio venta *</label>
+
+            {/* Costo total calculado */}
+            {form.baseCostPrice && (
+              <div className="flex items-center gap-2 rounded-lg bg-white border border-zinc-200 px-3 py-2">
+                <Info size={14} className="text-teal-600 shrink-0" />
+                <p className="text-xs text-zinc-600">
+                  Precio de costo total (con impuestos):{" "}
+                  <span className="font-bold text-zinc-900">{ars(totalCostPrice)}</span>
+                </p>
+              </div>
+            )}
+
+            {/* Calculadora de ganancia */}
+            <div className="grid gap-3 sm:grid-cols-2 border-t border-zinc-200 pt-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-600">Ganancia (%)</label>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.1"
+                  value={form.profitPercent}
+                  onChange={(e) => set("profitPercent", e.target.value)}
+                  placeholder="30"
+                  className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none ring-teal-500 focus:ring"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-400">Precio sugerido</label>
+                <div className="flex h-9 items-center rounded-lg border border-dashed border-zinc-300 bg-zinc-100 px-3 text-sm text-zinc-500">
+                  {recommendedSalePrice != null && form.baseCostPrice
+                    ? ars(recommendedSalePrice)
+                    : "—"}
+                </div>
+              </div>
+            </div>
+
+            {/* Precio de venta final */}
+            <div className="border-t border-zinc-200 pt-3">
+              <label className="mb-1 block text-xs font-medium text-zinc-600">
+                Precio de venta *{" "}
+                <span className="font-normal text-zinc-400">(el que vos decidís)</span>
+              </label>
               <input
                 type="number"
                 min={0}
@@ -266,9 +379,13 @@ export default function ProductosPage() {
                 value={form.salePrice}
                 onChange={(e) => set("salePrice", e.target.value)}
                 placeholder="0.00"
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none ring-teal-500 focus:ring"
+                className="w-full rounded-lg border border-teal-400 bg-white px-3 py-2 text-sm font-medium outline-none ring-teal-500 focus:ring"
               />
             </div>
+          </div>
+
+          {/* Stock */}
+          <div className="grid gap-3 sm:grid-cols-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-zinc-600">Stock actual</label>
               <input
@@ -380,7 +497,9 @@ export default function ProductosPage() {
                     </div>
                     <div className="shrink-0 text-right hidden sm:block">
                       <p className="text-sm font-bold text-zinc-800">{ars(Number(p.salePrice))}</p>
-                      <p className="text-xs text-zinc-400">costo {ars(Number(p.costPrice))}</p>
+                      {isAdmin && (
+                        <p className="text-xs text-zinc-400">costo {ars(Number(p.costPrice))}</p>
+                      )}
                     </div>
                     <div className="shrink-0 text-right">
                       <p className={`text-sm font-bold ${stockOk ? "text-teal-700" : stockLow ? "text-amber-600" : "text-red-600"}`}>
@@ -388,22 +507,24 @@ export default function ProductosPage() {
                       </p>
                       <p className="text-xs text-zinc-400">mín. {minStock}</p>
                     </div>
-                    <div className="flex shrink-0 gap-1">
-                      <button
-                        onClick={() => openEdit(p)}
-                        className="rounded-lg border border-zinc-200 p-2 text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
-                        title="Editar"
-                      >
-                        <Pencil size={14} />
-                      </button>
-                      <button
-                        onClick={() => remove(p.id, p.name)}
-                        className="rounded-lg border border-zinc-200 p-2 text-zinc-400 hover:bg-red-50 hover:text-red-600"
-                        title="Eliminar"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
+                    {isAdmin && (
+                      <div className="flex shrink-0 gap-1">
+                        <button
+                          onClick={() => openEdit(p)}
+                          className="rounded-lg border border-zinc-200 p-2 text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
+                          title="Editar"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          onClick={() => remove(p.id, p.name)}
+                          className="rounded-lg border border-zinc-200 p-2 text-zinc-400 hover:bg-red-50 hover:text-red-600"
+                          title="Eliminar"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}

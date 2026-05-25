@@ -21,7 +21,7 @@ const ars = (value: number) =>
   }).format(value);
 
 export function AdminDashboard({ data }: { data: AdminDashboardData }) {
-  const { kpis, lowStockProducts, recentSales, topProducts, chartData } = data;
+  const { kpis, productsWithoutPrice, lowStockProducts, recentSales, topProducts, chartData } = data;
 
   const today = new Date().toLocaleDateString("es-AR", {
     weekday: "long",
@@ -36,6 +36,33 @@ export function AdminDashboard({ data }: { data: AdminDashboardData }) {
         <h1 className="text-2xl font-bold text-zinc-900">Dashboard</h1>
         <p className="text-sm capitalize text-zinc-500">{today}</p>
       </div>
+
+      {/* === Alertas de precios === */}
+      {productsWithoutPrice.length > 0 && (
+        <section>
+          <div className="rounded-2xl border border-amber-300 bg-amber-50 p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertTriangle size={18} className="text-amber-600 shrink-0" />
+              <h3 className="font-semibold text-amber-800">
+                {productsWithoutPrice.length} {productsWithoutPrice.length === 1 ? "producto sin" : "productos sin"} precio de costo
+              </h3>
+            </div>
+            <p className="text-xs text-amber-700 mb-3">
+              Estos productos no tienen precio de costo definido. El cálculo de ganancia será incorrecto hasta que se actualicen.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {productsWithoutPrice.map((p) => (
+                <span
+                  key={p.id}
+                  className="rounded-full bg-amber-100 border border-amber-200 px-3 py-1 text-xs font-medium text-amber-800"
+                >
+                  {p.name}
+                </span>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* === Finanzas === */}
       <section>

@@ -61,7 +61,7 @@ export async function getAdminDashboardData() {
       select: {
         quantity: true,
         total: true,
-        product: { select: { costPrice: true } },
+        unitCost: true,
       },
     }),
     prisma.sale.findMany({
@@ -95,9 +95,12 @@ export async function getAdminDashboardData() {
   const lowStockProducts = activeProducts.filter(
     (p) => Number(p.stock) <= Number(p.minStock),
   );
+  const productsWithoutPrice = activeProducts.filter(
+    (p) => Number(p.costPrice) === 0,
+  );
 
   const monthProfit = monthSaleItems.reduce((sum, item) => {
-    return sum + Number(item.total) - Number(item.quantity) * Number(item.product.costPrice);
+    return sum + Number(item.total) - Number(item.quantity) * Number(item.unitCost);
   }, 0);
 
   const thisMonthTotal = Number(monthSales._sum.total ?? 0);
@@ -157,6 +160,7 @@ export async function getAdminDashboardData() {
       suppliersCount,
       todayMovementsCount,
     },
+    productsWithoutPrice: productsWithoutPrice.slice(0, 10),
     lowStockProducts: lowStockProducts.slice(0, 6),
     recentSales,
     topProducts,

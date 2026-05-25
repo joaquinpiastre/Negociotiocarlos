@@ -8,6 +8,7 @@ import {
   ShoppingBag,
   ShoppingCart,
   Tags,
+  Trash2,
   Truck,
   Users,
 } from "lucide-react";
@@ -18,6 +19,7 @@ export const navigationItems = [
   { href: "/scanner", label: "Scanner", icon: PackageSearch },
   { href: "/ventas", label: "Ventas", icon: ShoppingCart },
   { href: "/stock", label: "Stock", icon: ClipboardList },
+  { href: "/bajas", label: "Bajas", icon: Trash2 },
   { href: "/compras", label: "Compras", icon: ShoppingBag },
   { href: "/proveedores", label: "Proveedores", icon: Truck },
   { href: "/categorias", label: "Categorias", icon: Tags },

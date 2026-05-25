@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Truck, Plus, Pencil, Trash2, Loader2, X, Check } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Truck, Plus, Pencil, Trash2, Loader2, X, Check, ArrowRight, TrendingDown } from "lucide-react";
 
 type Supplier = {
   id: string;
@@ -12,11 +13,18 @@ type Supplier = {
   cuit: string | null;
   notes: string | null;
   _count: { products: number; purchaseOps: number };
+  totalPurchased: number;
+  totalPaid: number;
+  balance: number;
 };
 
 const emptyForm = { name: "", phone: "", email: "", address: "", cuit: "", notes: "" };
 
+const ars = (v: number) =>
+  new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(v);
+
 export default function ProveedoresPage() {
+  const router = useRouter();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(emptyForm);
@@ -80,6 +88,8 @@ export default function ProveedoresPage() {
     }
   };
 
+  const totalDeuda = suppliers.reduce((sum, s) => sum + Math.max(0, s.balance), 0);
+
   return (
     <div className="space-y-4 pb-24 lg:pb-6">
       <div className="flex items-center justify-between">
@@ -97,6 +107,17 @@ export default function ProveedoresPage() {
           <Plus size={16} /> Nuevo
         </button>
       </div>
+
+      {/* Resumen de deuda total */}
+      {!loading && totalDeuda > 0 && (
+        <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+          <TrendingDown size={18} className="text-red-600 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-red-800">Deuda total con proveedores</p>
+            <p className="text-xs text-red-600">{ars(totalDeuda)} pendiente de pago</p>
+          </div>
+        </div>
+      )}
 
       {/* Formulario */}
       {showForm && (
@@ -154,31 +175,52 @@ export default function ProveedoresPage() {
           <p className="py-10 text-center text-sm text-zinc-400">Sin proveedores. Agregá el primero.</p>
         ) : (
           <div className="divide-y divide-zinc-100">
-            {suppliers.map((s) => (
-              <div key={s.id} className="flex items-start justify-between px-4 py-4">
-                <div className="min-w-0">
-                  <p className="font-semibold text-zinc-900">{s.name}</p>
-                  <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-zinc-500">
-                    {s.cuit && <span>CUIT: {s.cuit}</span>}
-                    {s.phone && <span>{s.phone}</span>}
-                    {s.email && <span>{s.email}</span>}
-                    {s.address && <span>{s.address}</span>}
+            {suppliers.map((s) => {
+              const hasDebt = s.balance > 0;
+              return (
+                <div key={s.id} className="flex items-start justify-between px-4 py-4 gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold text-zinc-900">{s.name}</p>
+                      {hasDebt && (
+                        <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                          Debe {ars(s.balance)}
+                        </span>
+                      )}
+                      {!hasDebt && s.totalPurchased > 0 && (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                          Al dia
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-zinc-500">
+                      {s.cuit && <span>CUIT: {s.cuit}</span>}
+                      {s.phone && <span>{s.phone}</span>}
+                      {s.email && <span>{s.email}</span>}
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-x-4 text-xs text-zinc-400">
+                      <span>{s._count.purchaseOps} compras</span>
+                      {s.totalPurchased > 0 && <span>Comprado: {ars(s.totalPurchased)}</span>}
+                      {s.totalPaid > 0 && <span>Pagado: {ars(s.totalPaid)}</span>}
+                    </div>
                   </div>
-                  <div className="mt-1 flex gap-3 text-xs text-zinc-400">
-                    <span>{s._count.products} productos</span>
-                    <span>{s._count.purchaseOps} compras</span>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      onClick={() => router.push(`/proveedores/${s.id}`)}
+                      className="flex items-center gap-1 rounded-lg border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-medium text-teal-700 hover:bg-teal-100"
+                    >
+                      Ver cuenta <ArrowRight size={12} />
+                    </button>
+                    <button onClick={() => openEdit(s)} className="rounded-lg border border-zinc-200 p-2 text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900">
+                      <Pencil size={14} />
+                    </button>
+                    <button onClick={() => remove(s.id)} className="rounded-lg border border-zinc-200 p-2 text-zinc-400 hover:bg-red-50 hover:text-red-600">
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 </div>
-                <div className="flex shrink-0 gap-1 ml-3">
-                  <button onClick={() => openEdit(s)} className="rounded-lg border border-zinc-200 p-2 text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900">
-                    <Pencil size={14} />
-                  </button>
-                  <button onClick={() => remove(s.id)} className="rounded-lg border border-zinc-200 p-2 text-zinc-400 hover:bg-red-50 hover:text-red-600">
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

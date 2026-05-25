@@ -63,42 +63,56 @@ model Category {
 }
 
 model Supplier {
-  id          String      @id @default(cuid())
+  id          String           @id @default(cuid())
   name        String
   phone       String?
   email       String?
   address     String?
   cuit        String?
   notes       String?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
   products    Product[]
   purchaseOps Purchase[]
+  payments    SupplierPayment[]
+}
+
+model SupplierPayment {
+  id         String        @id @default(cuid())
+  supplierId String
+  amount     Decimal       @db.Decimal(10, 2)
+  method     PaymentMethod
+  notes      String?
+  paidAt     DateTime      @default(now())
+  createdAt  DateTime      @default(now())
+  supplier   Supplier      @relation(fields: [supplierId], references: [id])
 }
 
 model Product {
-  id              String          @id @default(cuid())
-  barcode         String?         @unique
-  name            String
-  description     String?
-  brand           String?
-  costPrice       Decimal         @db.Decimal(10, 2)
-  salePrice       Decimal         @db.Decimal(10, 2)
-  stock           Decimal         @default(0) @db.Decimal(10, 3)
-  minStock        Decimal         @default(0) @db.Decimal(10, 3)
-  unitType        UnitType        @default(UNIDAD)
-  expiresAt       DateTime?
-  imageUrl        String?
-  active          Boolean         @default(true)
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  categoryId      String
-  supplierId      String?
-  category        Category        @relation(fields: [categoryId], references: [id])
-  supplier        Supplier?       @relation(fields: [supplierId], references: [id])
-  stockMovements  StockMovement[]
-  saleItems       SaleItem[]
-  purchaseItems   PurchaseItem[]
+  id                  String          @id @default(cuid())
+  barcode             String?         @unique
+  name                String
+  description         String?
+  brand               String?
+  costPrice           Decimal         @db.Decimal(10, 2)
+  ivaRate             Decimal         @default(0) @db.Decimal(5, 2)
+  internalTaxPercent  Decimal         @default(0) @db.Decimal(5, 2)
+  salePrice           Decimal         @db.Decimal(10, 2)
+  stock               Decimal         @default(0) @db.Decimal(10, 3)
+  minStock            Decimal         @default(0) @db.Decimal(10, 3)
+  unitType            UnitType        @default(UNIDAD)
+  expiresAt           DateTime?
+  imageUrl            String?
+  active              Boolean         @default(true)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  categoryId          String
+  supplierId          String?
+  category            Category        @relation(fields: [categoryId], references: [id])
+  supplier            Supplier?       @relation(fields: [supplierId], references: [id])
+  stockMovements      StockMovement[]
+  saleItems           SaleItem[]
+  purchaseItems       PurchaseItem[]
 }
 
 model StockMovement {
@@ -131,6 +145,7 @@ model SaleItem {
   id          String   @id @default(cuid())
   quantity    Decimal  @db.Decimal(10, 3)
   unitPrice   Decimal  @db.Decimal(10, 2)
+  unitCost    Decimal  @default(0) @db.Decimal(10, 2)
   total       Decimal  @db.Decimal(10, 2)
   saleId      String
   productId   String

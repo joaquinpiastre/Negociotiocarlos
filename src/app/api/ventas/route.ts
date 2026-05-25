@@ -69,12 +69,16 @@ export async function POST(request: Request) {
         paymentMethod: paymentMethod as PaymentMethod,
         userId: session.user.id,
         items: {
-          create: items.map((i) => ({
-            productId: i.productId,
-            quantity: i.quantity,
-            unitPrice: i.unitPrice,
-            total: i.unitPrice * i.quantity,
-          })),
+          create: items.map((i) => {
+            const product = products.find((p) => p.id === i.productId)!;
+            return {
+              productId: i.productId,
+              quantity: i.quantity,
+              unitPrice: i.unitPrice,
+              unitCost: Number(product.costPrice),
+              total: i.unitPrice * i.quantity,
+            };
+          }),
         },
       },
     });

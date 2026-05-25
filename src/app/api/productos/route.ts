@@ -41,7 +41,7 @@ export async function POST(request: Request) {
   if (!session) return Response.json({ error: "No autorizado" }, { status: 401 });
 
   const body = await request.json();
-  const { name, barcode, costPrice, salePrice, stock, minStock, categoryId, supplierId, brand, unitType } = body;
+  const { name, barcode, costPrice, ivaRate, internalTaxPercent, salePrice, stock, minStock, categoryId, supplierId, brand, unitType } = body;
 
   if (!name || !categoryId || costPrice == null || salePrice == null) {
     return Response.json({ error: "Datos incompletos" }, { status: 400 });
@@ -52,6 +52,8 @@ export async function POST(request: Request) {
       name,
       barcode: barcode || null,
       costPrice: Number(costPrice),
+      ivaRate: Number(ivaRate ?? 0),
+      internalTaxPercent: Number(internalTaxPercent ?? 0),
       salePrice: Number(salePrice),
       stock: Number(stock ?? 0),
       minStock: Number(minStock ?? 1),

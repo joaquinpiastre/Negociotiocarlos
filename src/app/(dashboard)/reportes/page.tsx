@@ -32,7 +32,7 @@ export default async function ReportesPage() {
     }),
     prisma.saleItem.findMany({
       where: { sale: { createdAt: { gte: startOfMonth } } },
-      select: { quantity: true, total: true, product: { select: { costPrice: true } } },
+      select: { quantity: true, total: true, unitCost: true },
     }),
     prisma.purchaseItem.findMany({
       where: { purchase: { createdAt: { gte: startOfMonth } } },
@@ -66,7 +66,7 @@ export default async function ReportesPage() {
   const potentialRevenue = allActiveProducts.reduce((sum, p) => sum + Number(p.stock) * Number(p.salePrice), 0);
 
   const monthProfit = monthSaleItems.reduce(
-    (sum, i) => sum + Number(i.total) - Number(i.quantity) * Number(i.product.costPrice),
+    (sum, i) => sum + Number(i.total) - Number(i.quantity) * Number(i.unitCost),
     0,
   );
   const monthPurchaseTotal = purchaseItemsMonth.reduce((sum, i) => sum + Number(i.total), 0);
